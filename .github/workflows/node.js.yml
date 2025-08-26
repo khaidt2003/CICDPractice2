@@ -7,8 +7,8 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
+  pages: write       # cần cho deploy
+  id-token: write    # cần cho OIDC deploy
 
 concurrency:
   group: "pages"
@@ -18,17 +18,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4   # ✅ dùng @v4 (không @v4.1.3)
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true               # 👈 bật Pages tự động
+          static_site_generator: next    # 👈 để action tự tiêm basePath & images.unoptimized
 
       - name: Install deps
         run: npm ci --no-audit --no-fund
@@ -36,7 +37,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Export (static)
+      - name: Export static site
         run: npm run export
 
       - name: Verify out dir
