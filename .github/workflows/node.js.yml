@@ -1,15 +1,17 @@
-name: Deploy Next.js site to Pages
+name: Deploy Next.js site to GitHub Pages
 
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
 
+# GitHub Actions sẽ tự cấp GITHUB_TOKEN; ta chỉ cần cấp quyền cho workflow
 permissions:
   contents: read
-  pages: write       # cần cho deploy
-  id-token: write    # cần cho OIDC deploy
+  pages: write
+  id-token: write
 
+# Chỉ cho phép một lượt deploy chạy song song
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -18,21 +20,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Setup Pages
+      # Bật Pages (nếu chưa bật) + tự xử lý basePath / images khi export Next
+      - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
-          enablement: true               # 👈 bật Pages tự động
-          static_site_generator: next    # 👈 để action tự tiêm basePath & images.unoptimized
+          enablement: true               # để action tự bật Pages nếu repo chưa bật
+          static_site_generator: next    # auto inject basePath & unoptimized images cho export
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Disable Next telemetry
+        run: echo "NEXT_TELEMETRY_DISABLED=1" >> $GITHUB_ENV
 
       - name: Build
         run: npm run build
@@ -40,8 +48,10 @@ jobs:
       - name: Export static site
         run: npm run export
 
-      - name: Verify out dir
-        run: test -d out && ls -la out
+      - name: Verify out folder
+        run: |
+          test -d out || (echo "❌ 'out/' not found" && exit 1)
+          ls -la out | head -n 50
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -51,12 +61,12 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
